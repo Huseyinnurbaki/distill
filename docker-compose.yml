@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  distill:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DISTILL_ENV=production
+      - DISTILL_BASE_URL=http://localhost:3000
+      - DISTILL_SECRET_KEY=${DISTILL_SECRET_KEY:?DISTILL_SECRET_KEY is required}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - DATABASE_URL=file:/data/sqlite.db
+      - DISTILL_ROOT_USERNAME=${DISTILL_ROOT_USERNAME:-admin}
+      - DISTILL_ROOT_PASSWORD=${DISTILL_ROOT_PASSWORD:-admin}
+      - DISTILL_ROOT_EMAIL=${DISTILL_ROOT_EMAIL:-admin@example.com}
+      - DISTILL_GIT_BASE_PATH=/data/repos
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_AUTO_APPROVE=${GOOGLE_AUTO_APPROVE:-false}
+    volumes:
+      - distill-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  distill-data:
+    driver: local

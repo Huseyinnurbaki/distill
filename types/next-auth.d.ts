@@ -1,0 +1,31 @@
+import 'next-auth';
+import 'next-auth/jwt';
+
+declare module 'next-auth' {
+  interface User {
+    id: string;
+    username: string;
+    isAdmin: boolean;
+    isActive: boolean;
+  }
+
+  interface Session {
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      username: string;
+      isAdmin: boolean;
+      isActive: boolean;
+    };
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    userId: string;
+    username: string;
+    isAdmin: boolean;
+    isActive: boolean;
+  }
+}

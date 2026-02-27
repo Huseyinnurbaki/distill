@@ -1,0 +1,35 @@
+ai_instructions:
+  - This is Distill — a self-hosted AI chat tool that lets engineers ask questions about their git repositories.
+  - Built with Next.js 14 App Router, TypeScript, Prisma (SQLite), shadcn/ui, and Tailwind CSS.
+  - Authentication supports local credentials and Google OAuth (via NextAuth).
+  - AI providers are OpenAI and Anthropic; provider/model is selected per chat session.
+  - Repositories are stored as bare git mirrors on disk (DISTILL_GIT_BASE_PATH). All file reads go through git commands, never the filesystem directly.
+  - The Prisma client is a singleton in lib/prisma.ts. Always import from there.
+  - API routes live in app/api/. All routes require requireAuth() from lib/session.ts.
+  - UI components are shadcn/ui primitives in components/ui/. Prefer editing existing components over adding new ones.
+  - The main chat/file-explorer page is app/repos/[id]/page.tsx — it is large; read in sections when editing.
+  - RepoStructure records are upserted by (repoId, type, source) — use the named unique constraint repoId_type_source.
+
+context_files:
+  - prisma/schema.prisma
+
+branches:
+  important:
+    - main
+
+quick_questions:
+  - How does the streaming chat response work end to end?
+  - How is git repository mirroring implemented?
+  - How does .distill.yaml context injection work?
+  - How does the structure scanning work for Next.js routes and Prisma schemas?
+  - How is authentication handled for API routes?
+  - Walk me through creating a new chat from the UI to the database.
+
+structure:
+  frontend:
+    routing:
+      type: nextjs
+      directory: app
+  database:
+    schemas:
+      - prisma/schema.prisma

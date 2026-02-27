@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String?           // Optional for OAuth users
+  authProvider String   @default("local") // "local" | "google"
+  isAdmin      Boolean  @default(false)
+  isActive     Boolean  @default(false) // Default false for approval flow
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  repos            Repo[]
+  chats            Chat[]
+  messages         Message[]
+  docs             Doc[]
+  datasourceAccess DatasourceAccess[]
+
+  @@index([email])
+  @@index([authProvider])
+}
+
+model Repo {
+  id                  String    @id @default(cuid())
+  name                String
+  url                 String
+  accessType          String
+  encryptedToken      String?
+  defaultBranch       String
+  isGlobal            Boolean   @default(false) // True = shared with all users
+  pullIntervalMinutes Int       @default(10)
+  lastFetchedAt       DateTime?
+  aiContext           String?   // Cached context from .distill.yaml + context files
+  contextFileCommits  String?   // JSON string: Track commit SHAs of context files for change detection
+  contextUpdatedAt    DateTime? // When context was last rebuilt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  branches              RepoBranchSnapshot[]
+  chats                 Chat[]
+  docs                  Doc[]
+  structures            RepoStructure[]
+  datasourceAssignments DatasourceAssignment[]
+
+  @@index([userId])
+  @@index([isGlobal])
+}
+
+model RepoBranchSnapshot {
+  id        String   @id @default(cuid())
+  branch    String
+  commitSha String
+  createdAt DateTime @default(now())
+
+  repoId String
+  repo   Repo   @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@unique([repoId, branch, commitSha])
+  @@index([repoId])
+}
+
+model Chat {
+  id             String   @id @default(cuid())
+  type           String   @default("SNAPSHOT")
+  title          String?
+  includeContext Boolean  @default(true)
+
+  branch         String?
+  commitSha      String?
+
+  leftBranch     String?
+  leftCommitSha  String?
+  rightBranch    String?
+  rightCommitSha String?
+
+  personaName        String?
+  personaDescription String?
+
+  activeDatasourceId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  repoId String
+  repo   Repo   @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  messages Message[]
+
+  @@index([repoId])
+  @@index([userId])
+}
+
+model Persona {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String
+  isDefault   Boolean @default(false)
+
+  technicalDepth   Int @default(3)
+  codeExamples     Int @default(3)
+  assumedKnowledge Int @default(3)
+  businessContext  Int @default(3)
+  responseDetail   Int @default(3)
+
+  createdAt DateTime @default(now())
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  role      String
+  content   String
+  model     String?
+  provider  String?
+  createdAt DateTime @default(now())
+
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@index([userId])
+}
+
+model Doc {
+  id        String    @id @default(cuid())
+  title     String
+  status    String @default("DRAFT")
+  branch    String
+  commitSha String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  repoId String
+  repo   Repo   @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  versions DocVersion[]
+
+  @@index([repoId])
+  @@index([userId])
+}
+
+model DocVersion {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  docId String
+  doc   Doc    @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId])
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model RepoStructure {
+  id        String   @id @default(cuid())
+  type      String   // "routing" | "schema"
+  source    String   // directory or file path from .distill.yml
+  data      String   // JSON string of parsed structure
+  commitSha String   // commit at which this was last scanned
+  updatedAt DateTime @updatedAt
+
+  repoId String
+  repo   Repo   @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@unique([repoId, type, source])
+  @@index([repoId])
+}
+
+model Datasource {
+  id                  String    @id @default(cuid())
+  name                String
+  type                String    @default("postgres")
+  encryptedConnString String
+  cachedSchema        String?
+  schemaUpdatedAt     DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  assignments DatasourceAssignment[]
+  accessList  DatasourceAccess[]
+  dictionary  DatasourceDictionaryEntry[]
+}
+
+model DatasourceAssignment {
+  id     String @id @default(cuid())
+  branch String
+
+  datasourceId String
+  datasource   Datasource @relation(fields: [datasourceId], references: [id], onDelete: Cascade)
+
+  repoId String
+  repo   Repo   @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@unique([datasourceId, repoId, branch])
+  @@index([datasourceId])
+  @@index([repoId])
+}
+
+model DatasourceAccess {
+  id           String @id @default(cuid())
+  datasourceId String
+  datasource   Datasource @relation(fields: [datasourceId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([datasourceId, userId])
+  @@index([datasourceId])
+}
+
+model DatasourceDictionaryEntry {
+  id           String   @id @default(cuid())
+  term         String
+  aliases      String?
+  value        String
+  notes        String?
+  datasourceId String
+  datasource   Datasource @relation(fields: [datasourceId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([datasourceId])
+}
