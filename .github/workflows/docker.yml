@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  release:
+    types: [published]
 
 jobs:
   build:
@@ -25,11 +27,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # --- push to main: tag with latest + short SHA ---
       - name: Get short commit SHA
+        if: github.event_name == 'push'
         id: sha
         run: echo "short=$(git rev-parse --short=7 HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Build and push
+      - name: Build and push (commit)
+        if: github.event_name == 'push'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -38,5 +43,18 @@ jobs:
           tags: |
             hhaluk/distill:latest
             hhaluk/distill:${{ steps.sha.outputs.short }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- release published: tag with the release tag only ---
+      - name: Build and push (release)
+        if: github.event_name == 'release'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            hhaluk/distill:${{ github.event.release.tag_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
