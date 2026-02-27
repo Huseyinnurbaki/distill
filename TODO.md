@@ -103,7 +103,6 @@
   - [x] Install next-auth package
   - [x] Get Google OAuth credentials from console.cloud.google.com
   - [x] Add to .env and .env.example:
-    - NEXTAUTH_URL=http://localhost:3000
     - NEXTAUTH_SECRET=generated-secret
     - GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
     - GOOGLE_CLIENT_SECRET=GOCSPX-xxx

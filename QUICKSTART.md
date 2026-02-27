@@ -16,7 +16,6 @@ Edit `.env` and set at minimum:
 ```env
 DISTILL_BASE_URL=http://localhost:3000
 DISTILL_SECRET_KEY=<random 32+ character string>
-NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=<random 32+ character string>
 DISTILL_ROOT_USERNAME=admin
 DISTILL_ROOT_PASSWORD=<strong password>
@@ -124,7 +123,6 @@ Open http://localhost:3000
 |---|---|
 | `DISTILL_BASE_URL` | Public URL of your instance |
 | `DISTILL_SECRET_KEY` | Session + encryption key (32+ chars) |
-| `NEXTAUTH_URL` | Must match `DISTILL_BASE_URL` |
 | `NEXTAUTH_SECRET` | NextAuth secret (32+ chars) |
 | `DISTILL_ROOT_USERNAME` | Initial admin username |
 | `DISTILL_ROOT_PASSWORD` | Initial admin password |

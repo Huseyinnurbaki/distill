@@ -88,7 +88,6 @@ A self-hosted, branch-aware, commit-aware AI intelligence layer for Git reposito
 | `DISTILL_ENV`           | Environment (production/development)                   | Yes      |
 | `DISTILL_BASE_URL`      | Base URL of the application                            | Yes      |
 | `DISTILL_SECRET_KEY`    | Secret key for session encryption (32+ chars)          | Yes      |
-| `NEXTAUTH_URL`          | NextAuth base URL (same as DISTILL_BASE_URL)           | Yes      |
 | `NEXTAUTH_SECRET`       | NextAuth secret key (32+ chars)                        | Yes      |
 | `GOOGLE_CLIENT_ID`      | Google OAuth Client ID                                 | Optional |
 | `GOOGLE_CLIENT_SECRET`  | Google OAuth Client Secret                             | Optional |
@@ -121,7 +120,6 @@ Distill supports Google OAuth for user authentication with an admin approval flo
 Add to your `.env` file:
 
 ```env
-NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=generate-a-random-32-character-secret
 GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
