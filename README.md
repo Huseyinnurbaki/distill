@@ -30,11 +30,13 @@ A self-hosted, branch-aware, commit-aware AI intelligence layer for Git reposito
 
 1. Clone this repository
 2. Copy `.env.example` to `.env` and configure:
+
    ```bash
    cp .env.example .env
    ```
 
 3. Set your API keys in `.env`:
+
    ```env
    DISTILL_SECRET_KEY=your-secret-key-minimum-32-characters-long
    OPENAI_API_KEY=sk-...
@@ -42,6 +44,7 @@ A self-hosted, branch-aware, commit-aware AI intelligence layer for Git reposito
    ```
 
 4. Build and run with Docker Compose:
+
    ```bash
    docker-compose up -d
    ```
@@ -55,17 +58,20 @@ A self-hosted, branch-aware, commit-aware AI intelligence layer for Git reposito
 ## Development Setup
 
 1. Install dependencies:
+
    ```bash
    npm install
    ```
 
 2. Set up the database:
+
    ```bash
    mkdir -p data/repos
    npx prisma migrate deploy
    ```
 
 3. Create admin user:
+
    ```bash
    npm run db:init
    ```
@@ -77,22 +83,22 @@ A self-hosted, branch-aware, commit-aware AI intelligence layer for Git reposito
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DISTILL_ENV` | Environment (production/development) | Yes |
-| `DISTILL_BASE_URL` | Base URL of the application | Yes |
-| `DISTILL_SECRET_KEY` | Secret key for session encryption (32+ chars) | Yes |
-| `NEXTAUTH_URL` | NextAuth base URL (same as DISTILL_BASE_URL) | Yes |
-| `NEXTAUTH_SECRET` | NextAuth secret key (32+ chars) | Yes |
-| `GOOGLE_CLIENT_ID` | Google OAuth Client ID | Optional |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret | Optional |
-| `DATABASE_URL` | SQLite database path (default: `file:/data/sqlite.db`) | Optional |
-| `DISTILL_ROOT_USERNAME` | Root admin username | Yes |
-| `DISTILL_ROOT_PASSWORD` | Root admin password | Yes |
-| `DISTILL_ROOT_EMAIL` | Root admin email | Yes |
-| `DISTILL_GIT_BASE_PATH` | Path for storing git mirrors (default: `/data/repos`) | Optional |
-| `OPENAI_API_KEY` | OpenAI API key | Optional |
-| `ANTHROPIC_API_KEY` | Anthropic API key | Optional |
+| Variable                | Description                                            | Required |
+| ----------------------- | ------------------------------------------------------ | -------- |
+| `DISTILL_ENV`           | Environment (production/development)                   | Yes      |
+| `DISTILL_BASE_URL`      | Base URL of the application                            | Yes      |
+| `DISTILL_SECRET_KEY`    | Secret key for session encryption (32+ chars)          | Yes      |
+| `NEXTAUTH_URL`          | NextAuth base URL (same as DISTILL_BASE_URL)           | Yes      |
+| `NEXTAUTH_SECRET`       | NextAuth secret key (32+ chars)                        | Yes      |
+| `GOOGLE_CLIENT_ID`      | Google OAuth Client ID                                 | Optional |
+| `GOOGLE_CLIENT_SECRET`  | Google OAuth Client Secret                             | Optional |
+| `DATABASE_URL`          | SQLite database path (default: `file:/data/sqlite.db`) | Optional |
+| `DISTILL_ROOT_USERNAME` | Root admin username                                    | Yes      |
+| `DISTILL_ROOT_PASSWORD` | Root admin password                                    | Yes      |
+| `DISTILL_ROOT_EMAIL`    | Root admin email                                       | Yes      |
+| `DISTILL_GIT_BASE_PATH` | Path for storing git mirrors (default: `/data/repos`)  | Optional |
+| `OPENAI_API_KEY`        | OpenAI API key                                         | Optional |
+| `ANTHROPIC_API_KEY`     | Anthropic API key                                      | Optional |
 
 ## Google Sign-In Setup (Optional)
 
@@ -124,6 +130,7 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
 ### 3. How It Works
 
 **Approval Flow:**
+
 1. User clicks "Sign in with Google" on login page
 2. After Google authentication, account is created with **status: Pending**
 3. User sees "Pending Approval" page
@@ -132,6 +139,7 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
 6. Admin can set user as Admin or regular User
 
 **Benefits:**
+
 - ✅ Secure - No random access
 - ✅ Admin controls who gets in
 - ✅ Works alongside username/password login
@@ -150,11 +158,13 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
 ### Creating Chats
 
 **Snapshot Chat:**
+
 1. Select a branch
 2. Click "New Chat"
 3. Start asking questions about the code
 
 **Compare Chat:**
+
 1. Click "Compare" button
 2. Select two branches to compare
 3. AI will help explain differences
@@ -164,12 +174,14 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
 Personas let you control how the AI responds — useful for different audiences (e.g., a senior engineer vs. a new hire).
 
 **Managing Personas (Admin):**
+
 1. Go to **Admin → Settings**
 2. In the **Personas** section, click **Add Persona**
 3. Configure sliders: Technical Depth, Code Examples, Assumed Knowledge, Business Context, Response Detail
 4. Mark one persona as **Default** — it's applied to all new chats automatically
 
 **Using Personas in Chat:**
+
 - A persona chip appears in the chat header showing the active persona
 - Click it to switch to a different persona mid-chat
 - The AI adjusts its response style immediately
@@ -181,6 +193,7 @@ Personas let you control how the AI responds — useful for different audiences 
 Connect a live PostgreSQL database to a repo so the AI can answer data questions alongside code questions.
 
 **Setup (Admin):**
+
 1. Go to **Admin → Settings** → **Datasources** → **Add Datasource**
 2. Enter the connection string (stored encrypted at rest)
 3. Click **Test Connection** to verify
@@ -191,6 +204,7 @@ Connect a live PostgreSQL database to a repo so the AI can answer data questions
    - **Re-introspect Schema** — refresh the cached schema from the live DB (also triggered automatically on every Pull)
 
 **In Chat:**
+
 - When a datasource is assigned to the repo+branch, a 🗄 chip appears in the chat header
 - The AI receives the full table/column schema and data dictionary on every message
 - When the AI generates a SQL query, a **Run** button appears below the code block
@@ -207,6 +221,7 @@ The Structure tab (inside any repo's chat view) scans your codebase and displays
 - **Schema** — all Prisma or SQL database models with fields
 
 **To enable:**
+
 1. Add a `structure` section to your `.distill.yaml` (see below)
 2. Commit and push, then click **Pull** in Distill
 3. In the Structure tab click **Scan** — routes and schema are scanned and cached
@@ -240,11 +255,11 @@ context_files:
 
 # Branch Management
 branches:
-  important:              # Show these after primary branch, in this order
+  important: # Show these after primary branch, in this order
     - "develop"
     - "staging"
     - "production"
-  ignore:                 # Filter these out (supports glob patterns)
+  ignore: # Filter these out (supports glob patterns)
     - "dependabot/*"
     - "renovate/*"
     - "snyk-*"
@@ -260,23 +275,25 @@ quick_questions:
 structure:
   frontend:
     routing:
-      type: nextjs       # or 'react' for a routes file
-      directory: app     # scan this directory for page files
+      type: nextjs # or 'react' for a routes file
+      directory: app # scan this directory for page files
   database:
     schemas:
-      - prisma/schema.prisma   # Prisma schema
-      - db/schema.sql          # or raw SQL
+      - prisma/schema.prisma # Prisma schema
+      - db/schema.sql # or raw SQL
 ```
 
 #### How It Works
 
 **Setup (One Time):**
+
 1. In your repository (GitHub/GitLab/etc.), add `.distill.yaml` to the root
 2. Commit and push to your repository
 3. In Distill, click "Pull" button
 4. ✅ Configuration loaded!
 
 **Every Pull After That:**
+
 1. Distill checks commit SHAs of:
    - `.distill.yaml` itself
    - All files in `context_files`
@@ -285,16 +302,19 @@ structure:
 4. Context is cached and shared across all users
 
 **What Gets Cached:**
+
 - AI instructions from yaml
 - Full content of all context files (README, docs, etc.)
 - File commit SHAs for change detection
 
 **In Every Chat:**
+
 - AI receives your `ai_instructions` as behavioral guidelines
 - AI has full content of all `context_files` (README, docs, etc.)
 - AI knows the repository structure
 
 **Branch Filtering:**
+
 - Primary branch (main/master) shows first
 - Important branches listed next (in your specified order)
 - Branches matching `ignore` patterns are filtered out
@@ -303,31 +323,34 @@ structure:
 
 #### Field Descriptions
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `ai_instructions` | string[] | Rules and guidelines for AI behavior in this repo |
-| `context_files` | string[] | Paths to files that should be included in every chat (relative to repo root) |
-| `branches.important` | string[] | Branches to show after primary, in this order |
-| `branches.ignore` | string[] | Branch patterns to filter out (supports glob: `dependabot/*`) |
-| `quick_questions` | string[] | Pre-defined questions shown as shortcuts |
-| `structure.frontend.routing` | object | Routing scanner config (`type`, `directory` or `routes_file`) |
-| `structure.database.schemas` | string[] | Paths to Prisma or SQL schema files to scan |
+| Field                        | Type     | Description                                                                  |
+| ---------------------------- | -------- | ---------------------------------------------------------------------------- |
+| `ai_instructions`            | string[] | Rules and guidelines for AI behavior in this repo                            |
+| `context_files`              | string[] | Paths to files that should be included in every chat (relative to repo root) |
+| `branches.important`         | string[] | Branches to show after primary, in this order                                |
+| `branches.ignore`            | string[] | Branch patterns to filter out (supports glob: `dependabot/*`)                |
+| `quick_questions`            | string[] | Pre-defined questions shown as shortcuts                                     |
+| `structure.frontend.routing` | object   | Routing scanner config (`type`, `directory` or `routes_file`)                |
+| `structure.database.schemas` | string[] | Paths to Prisma or SQL schema files to scan                                  |
 
 #### Best Practices
 
 **Context Files:**
+
 - ✅ Include README and architecture docs
 - ✅ Keep it focused (2-5 key files)
 - ✅ Use relative paths from repo root
 - ✅ Avoid large files (token limits)
 
 **AI Instructions:**
+
 - ✅ Mention deprecated directories
 - ✅ Specify coding standards
 - ✅ Highlight important patterns
 - ✅ Keep instructions clear and specific
 
 **Branch Filtering:**
+
 - ✅ Ignore automated PR branches (dependabot, renovate)
 - ✅ List important branches in logical order
 - ✅ Use glob patterns for flexibility
@@ -371,6 +394,7 @@ If no `.distill.yaml` file exists, Distill works normally without custom configu
 ## Data Persistence
 
 All data is stored in the `/data` volume:
+
 - `/data/sqlite.db` - SQLite database
 - `/data/repos` - Git repository mirrors
 
@@ -430,4 +454,6 @@ The container automatically creates `/data/repos` and sets correct permissions o
 
 ## License
 
-[PolyForm Noncommercial License 1.0.0](LICENSE) — free for personal, educational, and non-commercial use. Commercial use is not permitted.
+Distill is open source under the Apache License 2.0.
+
+See the [LICENSE](./LICENSE) file for details.

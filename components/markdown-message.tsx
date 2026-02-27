@@ -167,7 +167,7 @@ export function MarkdownMessage({ content, className = '', onFilePathClick, acti
           return <div className="overflow-x-auto">{children}</div>;
         },
         p({ children }: any) {
-          return <p className="mb-4 leading-7 text-slate-700">{children}</p>;
+          return <div className="mb-4 leading-7 text-slate-700">{children}</div>;
         },
         ul({ children }: any) {
           return <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>;

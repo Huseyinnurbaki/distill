@@ -150,6 +150,7 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const [newChatPersonaId, setNewChatPersonaId] = useState<string>('');
   const [personaPickerOpen, setPersonaPickerOpen] = useState(false);
   const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
+  const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
   const [chatDatasources, setChatDatasources] = useState<Datasource[]>([]);
   const [activeDatasource, setActiveDatasource] = useState<Datasource | null>(null);
   const [dbPickerOpen, setDbPickerOpen] = useState(false);
@@ -196,6 +197,10 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
       enabled: chatDatasources.length > 1,
     },
   ];
+
+  const filteredCommands = input.startsWith('/')
+    ? availableCommands.filter((cmd) => cmd.command.startsWith(input.toLowerCase()))
+    : availableCommands;
 
   useEffect(() => {
     if (user) {
@@ -1588,13 +1593,13 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                 <div className="border-t bg-white p-4 flex-shrink-0">
                   <div className="max-w-6xl mx-auto relative">
                     {/* Command suggestions */}
-                    {showCommandSuggestions && (
+                    {showCommandSuggestions && filteredCommands.length > 0 && (
                       <div className="absolute bottom-full mb-2 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-10">
                         <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">
                           <p className="text-xs font-semibold text-slate-700">Available Commands</p>
                         </div>
                         <div className="max-h-64 overflow-y-auto">
-                          {availableCommands.map((cmd) => (
+                          {filteredCommands.map((cmd, idx) => (
                             <button
                               key={cmd.command}
                               onClick={() => {
@@ -1603,7 +1608,8 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                               }}
                               disabled={!cmd.enabled}
                               className={cn(
-                                "w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors",
+                                "w-full text-left px-3 py-2 transition-colors",
+                                idx === commandSelectedIndex ? "bg-slate-100" : "hover:bg-slate-50",
                                 !cmd.enabled && "opacity-50 cursor-not-allowed"
                               )}
                             >
@@ -1635,9 +1641,30 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                           ref={inputRef}
                           value={input}
                           onChange={(e) => {
-                            setInput(e.target.value);
-                            // Show command suggestions when user types /
-                            setShowCommandSuggestions(e.target.value === '/');
+                            const val = e.target.value;
+                            setInput(val);
+                            const show = val.startsWith('/');
+                            setShowCommandSuggestions(show);
+                            if (show) setCommandSelectedIndex(0);
+                          }}
+                          onKeyDown={(e) => {
+                            if (!showCommandSuggestions) return;
+                            if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              setCommandSelectedIndex((i) => Math.min(i + 1, filteredCommands.length - 1));
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              setCommandSelectedIndex((i) => Math.max(i - 1, 0));
+                            } else if (e.key === 'Enter') {
+                              const cmd = filteredCommands[commandSelectedIndex];
+                              if (cmd) {
+                                e.preventDefault();
+                                setInput(cmd.command);
+                                setShowCommandSuggestions(false);
+                              }
+                            } else if (e.key === 'Escape') {
+                              setShowCommandSuggestions(false);
+                            }
                           }}
                           onBlur={() => setTimeout(() => setShowCommandSuggestions(false), 200)}
                           placeholder="Ask about the code... (type / to see commands)"
@@ -2073,7 +2100,7 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                   </div>
                   <p className="text-xs text-slate-500">{persona.description}</p>
                   <div className="flex justify-center mt-1">
-                    <PersonaRadarChart persona={persona} size={180} color="#7c3aed" />
+                    <PersonaRadarChart persona={persona} size={220} color="#7c3aed" />
                   </div>
                 </button>
               ))}
