@@ -6,11 +6,10 @@ A self-hosted, branch-aware, commit-aware AI intelligence layer for Git reposito
 
 - **Branch & Commit Awareness**: Every chat is tied to a specific branch and commit SHA
 - **Snapshot Chats**: Chat with a specific branch snapshot
-- **Compare Chats**: Compare two branches side-by-side
 - **Read-Only Access**: HTTPS-only, read-only repository access
 - **Multiple AI Providers**: Support for OpenAI and Anthropic
 - **Self-Hosted**: Fully containerized, no external dependencies except AI APIs
-- **Local Auth**: Simple username/password authentication
+- **Auth**: Simple username/password authentication + Google SSO
 - **Markdown Docs**: Publish documentation tied to specific commits
 - **Structure Explorer**: Auto-scan and visualize your repository's routes and database schema
 - **Schema Viewer**: Interactive board for exploring database models and their relations
