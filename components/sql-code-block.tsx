@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
@@ -18,7 +18,7 @@ interface SqlCodeBlockProps {
   onResult?: (result: QueryResult) => void;
 }
 
-export function SqlCodeBlock({ sql, datasourceId, canExecute, onResult }: SqlCodeBlockProps) {
+function SqlCodeBlockBase({ sql, datasourceId, canExecute, onResult }: SqlCodeBlockProps) {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rowCount, setRowCount] = useState<number | null>(null);
@@ -109,3 +109,5 @@ export function SqlCodeBlock({ sql, datasourceId, canExecute, onResult }: SqlCod
     </div>
   );
 }
+
+export const SqlCodeBlock = memo(SqlCodeBlockBase);

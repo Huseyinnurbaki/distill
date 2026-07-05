@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -61,7 +62,7 @@ function wrapAsciDiagrams(content: string): string {
   return result.join('\n');
 }
 
-export function MarkdownMessage({ content, className = '', onFilePathClick, activeDatasourceId, canExecute = false, onQueryResult }: MarkdownMessageProps) {
+function MarkdownMessageBase({ content, className = '', onFilePathClick, activeDatasourceId, canExecute = false, onQueryResult }: MarkdownMessageProps) {
   const processedContent = wrapAsciDiagrams(content);
 
   const detectAndRenderFilePaths = (text: string) => {
@@ -326,3 +327,5 @@ export function MarkdownMessage({ content, className = '', onFilePathClick, acti
     </div>
   );
 }
+
+export const MarkdownMessage = memo(MarkdownMessageBase);

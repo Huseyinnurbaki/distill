@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState, useRef } from 'react';
+import { use, useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -20,10 +20,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { GitBranch, Send, Square, RefreshCw, ArrowLeft, GitCompare, ArrowDown, ArrowUp, Trash2, FileText, ChevronLeft, ChevronRight, Download, MoreVertical, FolderOpen, Folder, File, Check, ChevronsUpDown, Copy, FoldVertical, MessageSquarePlus, Info, X, Settings, Network, Database, Route, ExternalLink } from 'lucide-react';
+import { GitBranch, Square, SquarePen, PanelLeft, FolderGit2, RefreshCw, GitCompare, ArrowDown, ArrowUp, Trash2, FileText, ChevronLeft, ChevronRight, Download, MoreVertical, FolderOpen, Folder, File, Check, ChevronsUpDown, Copy, FoldVertical, MessageSquarePlus, Info, X, Settings, Network, Database, Route, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MarkdownMessage } from '@/components/markdown-message';
+import { UserMessageContent } from '@/components/user-message-content';
 import { PersonaRadarChart } from '@/components/persona-radar-chart';
 import { QueryResultModal } from '@/components/query-result-modal';
 import type { QueryResult } from '@/components/sql-code-block';
@@ -100,8 +101,6 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const [model, setModel] = useState('');
   const [availableModels, setAvailableModels] = useState<{ id: string; name: string }[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
-  const [newChatAvailableModels, setNewChatAvailableModels] = useState<{ id: string; name: string }[]>([]);
-  const [newChatModelsLoading, setNewChatModelsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [showScrollButtons, setShowScrollButtons] = useState(false);
@@ -130,10 +129,9 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [viewingFile, setViewingFile] = useState<{ path: string; content: string } | null>(null);
   const [newChatSelectorOpen, setNewChatSelectorOpen] = useState(false);
+  const [sidebarNewChatOpen, setSidebarNewChatOpen] = useState(false);
   const [newChatModalOpen, setNewChatModalOpen] = useState(false);
   const [newChatBranch, setNewChatBranch] = useState('');
-  const [newChatProvider, setNewChatProvider] = useState('');
-  const [newChatModel, setNewChatModel] = useState('');
   const [newChatIncludeContext, setNewChatIncludeContext] = useState(true);
   const [autoIncludeContext, setAutoIncludeContext] = useState(true);
   const [contextMessage, setContextMessage] = useState<{ userMsg: string; aiMsg: string; fromBranch: string } | null>(null);
@@ -296,36 +294,24 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   };
 
   useEffect(() => {
-    fetchModels(provider, false);
+    fetchModels(provider);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider]);
 
-  useEffect(() => {
-    if (newChatProvider) fetchModels(newChatProvider, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newChatProvider]);
-
-  const fetchModels = async (p: string, forNewChat: boolean) => {
-    if (forNewChat) setNewChatModelsLoading(true);
-    else setModelsLoading(true);
+  const fetchModels = async (p: string) => {
+    setModelsLoading(true);
     try {
       const res = await fetch(`/api/models?provider=${p}`);
       const data = await res.json();
       if (data.models?.length) {
-        if (forNewChat) {
-          setNewChatAvailableModels(data.models);
-          setNewChatModel((prev) => data.models.find((m: { id: string }) => m.id === prev) ? prev : data.models[0].id);
-        } else {
-          setAvailableModels(data.models);
-          // Keep current model if valid, otherwise fall back to first in list
-          setModel((prev) => prev && data.models.find((m: { id: string }) => m.id === prev) ? prev : data.models[0].id);
-        }
+        setAvailableModels(data.models);
+        // Keep current model if valid, otherwise fall back to first in list
+        setModel((prev) => prev && data.models.find((m: { id: string }) => m.id === prev) ? prev : data.models[0].id);
       }
     } catch {
       // Keep existing model selection on failure
     } finally {
-      if (forNewChat) setNewChatModelsLoading(false);
-      else setModelsLoading(false);
+      setModelsLoading(false);
     }
   };
 
@@ -414,11 +400,7 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  const highlightAndOpenFile = (filePath: string) => {
-    console.log('highlightAndOpenFile called with:', filePath);
-    console.log('Available files:', repoFiles.slice(0, 10)); // Show first 10 files
-    console.log('File exists in repo?', repoFiles.includes(filePath));
-
+  const highlightAndOpenFile = useCallback((filePath: string) => {
     // Check if file exists
     if (!repoFiles.includes(filePath)) {
       toast.error(`File not found: ${filePath}`);
@@ -432,13 +414,13 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
 
     // Expand all parent folders
     const parts = filePath.split('/');
-    const newExpanded = new Set(expandedFolders);
-    for (let i = 0; i < parts.length - 1; i++) {
-      const folderPath = parts.slice(0, i + 1).join('/');
-      newExpanded.add(folderPath);
-      console.log('Expanding folder:', folderPath);
-    }
-    setExpandedFolders(newExpanded);
+    setExpandedFolders((prev) => {
+      const newExpanded = new Set(prev);
+      for (let i = 0; i < parts.length - 1; i++) {
+        newExpanded.add(parts.slice(0, i + 1).join('/'));
+      }
+      return newExpanded;
+    });
 
     // Highlight the file briefly
     setTimeout(() => {
@@ -450,11 +432,10 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
         setTimeout(() => {
           element.classList.remove('bg-yellow-200');
         }, 2000);
-      } else {
-        console.error('Could not find element with data-file-path:', filePath);
       }
     }, 300);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoFiles]);
 
   const renderContentWithClickablePaths = (content: string) => {
     const parts: (string | JSX.Element)[] = [];
@@ -506,8 +487,6 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const openNewChatModal = (msgIndex: number) => {
     // Pre-fill with current selections
     setNewChatBranch(selectedBranch);
-    setNewChatProvider(provider);
-    setNewChatModel(model);
     setNewChatIncludeContext(activeChat?.includeContext ?? true);
 
     // Capture context from the current conversation
@@ -593,15 +572,13 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             content: contextText,
-            model: newChatModel,
-            provider: newChatProvider,
+            model,
+            provider,
           }),
         });
       }
 
-      // Update selections
-      setProvider(newChatProvider);
-      setModel(newChatModel);
+      // New chat keeps the current provider/model selection
       setSelectedBranch(newChatBranch);
 
       setActiveChat(data.chat);
@@ -905,6 +882,7 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
       fetchChats();
       toast.success(`New chat created on ${branchToUse}`);
       setNewChatSelectorOpen(false);
+      setSidebarNewChatOpen(false);
     } catch (error: any) {
       console.error('Create chat error:', error);
       toast.error(error.message || 'Failed to create chat');
@@ -1257,147 +1235,180 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
-      <div className="border-b bg-white shadow-sm flex-shrink-0">
-        <div className="max-w-full px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => router.push('/repos')}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-              <div className="flex items-center gap-3">
-                <GitBranch className="w-6 h-6 text-blue-600" />
-                <div>
-                  <h1 className="text-xl font-bold text-slate-900">{repo.name}</h1>
-                  <p className="text-xs text-slate-500">{repo.url}</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Popover open={newChatSelectorOpen} onOpenChange={setNewChatSelectorOpen}>
-                <PopoverTrigger asChild>
-                  <Button size="sm">
-                    New Chat
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0">
-                  <Command>
-                    <CommandInput placeholder="Search branches..." />
-                    <CommandList>
-                      <CommandEmpty>No branch found.</CommandEmpty>
-                      <CommandGroup heading="Select branch for new chat">
-                        {branches.map((b) => (
-                          <CommandItem
-                            key={b.branch}
-                            value={b.branch}
-                            onSelect={(branch) => handleNewChat(branch)}
-                          >
-                            <GitBranch className="mr-2 h-4 w-4 text-slate-500" />
-                            <span className="truncate">{b.branch}</span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-
-              <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="flex-1 flex overflow-hidden h-full">
         <div
           className={cn(
-            "border-r bg-white overflow-y-auto transition-all duration-300 relative",
+            "border-r bg-slate-100 flex flex-col transition-all duration-300 relative",
             sidebarCollapsed ? "w-12" : "w-64"
           )}
         >
           {/* Toggle Button */}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="absolute top-2 right-2 z-10 p-1.5 hover:bg-slate-100 rounded transition-colors"
+            className={cn(
+              "absolute top-2 z-10 p-1.5 hover:bg-slate-200 rounded-lg transition-colors",
+              sidebarCollapsed ? "left-1/2 -translate-x-1/2" : "right-2"
+            )}
             title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {sidebarCollapsed ? (
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            ) : (
-              <ChevronLeft className="w-4 h-4 text-slate-600" />
-            )}
+            <PanelLeft className="w-4 h-4 text-slate-600" />
           </button>
 
           {!sidebarCollapsed && (
-            <div className="p-4">
-              <h3 className="font-semibold text-sm text-slate-700 mb-3">Chats</h3>
-              <div className="space-y-2">
-                {chats.map((chat) => (
-                  <div
-                    key={chat.id}
-                    className={cn(
-                      'relative group rounded-lg transition-colors',
-                      activeChat?.id === chat.id
-                        ? 'bg-blue-100'
-                        : 'hover:bg-slate-100'
-                    )}
-                  >
-                    <button
-                      onClick={() => handleSelectChat(chat)}
+            <>
+              <div className="px-4 pt-2 flex-shrink-0">
+                <button
+                  onClick={() => router.push('/repos')}
+                  className="flex items-center gap-2 h-7 mb-4 group"
+                  title="Back to repositories"
+                >
+                  <GitBranch className="w-5 h-5 text-blue-600" />
+                  <span className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">Distill</span>
+                </button>
+                <div
+                  className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-white border border-slate-200"
+                  title={repo?.url}
+                >
+                  <FolderGit2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span className="text-sm font-medium text-slate-800 truncate">{repo?.name}</span>
+                </div>
+                <Popover open={sidebarNewChatOpen} onOpenChange={setSidebarNewChatOpen}>
+                  <PopoverTrigger asChild>
+                    <button className="w-full flex items-center gap-2 px-3 py-2 mb-3 text-sm rounded-lg text-slate-700 hover:bg-slate-200 transition-colors">
+                      <SquarePen className="w-4 h-4" />
+                      New chat
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0" side="right" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search branches..." />
+                      <CommandList>
+                        <CommandEmpty>No branch found.</CommandEmpty>
+                        <CommandGroup heading="Select branch for new chat">
+                          {branches.map((b) => (
+                            <CommandItem
+                              key={b.branch}
+                              value={b.branch}
+                              onSelect={(branch) => handleNewChat(branch)}
+                            >
+                              <GitBranch className="mr-2 h-4 w-4 text-slate-500" />
+                              <span className="truncate">{b.branch}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <h3 className="font-semibold text-sm text-slate-700 mb-2">Chats</h3>
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 pb-4">
+                <div className="space-y-1">
+                  {chats.map((chat) => (
+                    <div
+                      key={chat.id}
                       className={cn(
-                        'w-full text-left px-3 py-2 text-sm',
+                        'relative group rounded-lg transition-colors',
                         activeChat?.id === chat.id
-                          ? 'text-blue-900'
-                          : 'text-slate-700'
+                          ? 'bg-blue-100'
+                          : 'hover:bg-slate-200'
                       )}
                     >
-                      <div className="font-medium truncate pr-8">{chat.title || 'Untitled'}</div>
-                      <div className="text-xs text-slate-500 truncate">
-                        {chat.type === 'COMPARE' ? (
-                          <>
-                            {chat.leftBranch} ↔ {chat.rightBranch}
-                          </>
-                        ) : (
-                          chat.branch
+                      <button
+                        onClick={() => handleSelectChat(chat)}
+                        className={cn(
+                          'w-full text-left px-3 py-2 text-sm',
+                          activeChat?.id === chat.id
+                            ? 'text-blue-900'
+                            : 'text-slate-700'
                         )}
-                      </div>
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteChat(chat.id, e)}
-                      className="absolute right-2 top-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded transition-opacity"
-                      title="Delete chat"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    </button>
-                  </div>
-                ))}
+                      >
+                        <div className="font-medium truncate pr-6">
+                          {chat.type === 'COMPARE'
+                            ? `${chat.leftBranch} ↔ ${chat.rightBranch}`
+                            : (chat.branch ? `${chat.branch} branch` : (chat.title || 'Untitled'))}
+                        </div>
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 hover:bg-slate-300 rounded transition-opacity"
+                            title="Options"
+                          >
+                            <MoreVertical className="w-4 h-4 text-slate-500" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => handleDeleteChat(chat.id, e)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+              <div className="flex-shrink-0 border-t border-slate-200 p-2">
+                <button
+                  onClick={() => setSettingsOpen(true)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-slate-700 hover:bg-slate-200 transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </button>
+              </div>
+            </>
           )}
 
           {sidebarCollapsed && (
-            <div className="flex flex-col items-center pt-16 space-y-3">
-              {chats.map((chat) => (
+            <>
+              <div className="flex-1 flex flex-col items-center pt-16">
+                <Popover open={sidebarNewChatOpen} onOpenChange={setSidebarNewChatOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="p-1.5 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
+                      title="New chat"
+                    >
+                      <SquarePen className="w-4 h-4" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0" side="right" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search branches..." />
+                      <CommandList>
+                        <CommandEmpty>No branch found.</CommandEmpty>
+                        <CommandGroup heading="Select branch for new chat">
+                          {branches.map((b) => (
+                            <CommandItem
+                              key={b.branch}
+                              value={b.branch}
+                              onSelect={(branch) => handleNewChat(branch)}
+                            >
+                              <GitBranch className="mr-2 h-4 w-4 text-slate-500" />
+                              <span className="truncate">{b.branch}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="flex-shrink-0 border-t border-slate-200 py-2 flex justify-center">
                 <button
-                  key={chat.id}
-                  onClick={() => handleSelectChat(chat)}
-                  className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center transition-colors',
-                    activeChat?.id === chat.id
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                  )}
-                  title={chat.title || 'Untitled'}
+                  onClick={() => setSettingsOpen(true)}
+                  className="p-1.5 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
+                  title="Settings"
                 >
-                  <span className="text-xs font-semibold">
-                    {(chat.title || 'U').charAt(0).toUpperCase()}
-                  </span>
+                  <Settings className="w-4 h-4" />
                 </button>
-              ))}
-            </div>
+              </div>
+            </>
           )}
         </div>
 
@@ -1405,23 +1416,7 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
           <div className="flex-1 flex flex-col overflow-hidden">
             {activeChat ? (
               <>
-                <div className="border-b border-slate-300 bg-white px-6 py-2 flex-shrink-0">
-                  <div className="max-w-6xl mx-auto text-sm">
-                    <span className="font-semibold text-slate-900">{activeChat.title}</span>
-                    <span className="text-slate-500">
-                      {activeChat.type === 'COMPARE' ? (
-                        <>
-                          {' '}({activeChat.leftBranch}@{activeChat.leftBranch?.slice(0, 7)} ↔{' '}
-                          {activeChat.rightBranch}@{activeChat.rightBranch?.slice(0, 7)})
-                        </>
-                      ) : (
-                        <>@{activeChat.commitSha?.slice(0, 7)}</>
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex-1 relative overflow-hidden">
+                <div className="flex-1 relative overflow-hidden bg-white">
                   <div
                     ref={scrollViewportRef}
                     onScroll={handleScroll}
@@ -1518,8 +1513,8 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                             >
                               <Card
                                 className={cn(
-                                  'overflow-hidden',
-                                  msg.role === 'user' ? 'bg-blue-600 text-white w-auto max-w-[80%]' : msg.error ? 'bg-red-50 border-red-200 w-full' : 'bg-white w-full'
+                                  'overflow-hidden rounded-2xl',
+                                  msg.role === 'user' ? 'bg-blue-50 border border-blue-100 text-slate-800 w-auto max-w-[80%]' : msg.error ? 'bg-red-50 border-red-200 w-full' : 'bg-transparent border-0 shadow-none w-full'
                                 )}
                               >
                                 <CardContent className="p-4">
@@ -1531,15 +1526,15 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                                         const bodyPart = msg.content.slice(sep + 2);
                                         return (
                                           <div className="text-sm space-y-2">
-                                            <div className="flex items-start gap-2 opacity-75">
-                                              <div className="w-0.5 self-stretch bg-blue-200 rounded-full flex-shrink-0" />
-                                              <span className="italic text-xs leading-relaxed line-clamp-2">{quotePart}</span>
+                                            <div className="flex items-start gap-2">
+                                              <div className="w-0.5 self-stretch bg-blue-300 rounded-full flex-shrink-0" />
+                                              <span className="italic text-xs leading-relaxed line-clamp-2 text-slate-500">{quotePart}</span>
                                             </div>
-                                            <div className="whitespace-pre-wrap">{bodyPart}</div>
+                                            <UserMessageContent content={bodyPart} />
                                           </div>
                                         );
                                       }
-                                      return <div className="text-sm whitespace-pre-wrap">{msg.content}</div>;
+                                      return <div className="text-sm"><UserMessageContent content={msg.content} /></div>;
                                     })()
                                   ) : msg.error ? (
                                     <div className="text-sm text-red-700 flex items-start gap-2">
@@ -1552,14 +1547,14 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                                       onFilePathClick={highlightAndOpenFile}
                                       activeDatasourceId={activeDatasource?.id}
                                       canExecute={activeDatasource?.canExecute ?? false}
-                                      onQueryResult={(result) => setQueryResultOpen(result)}
+                                      onQueryResult={setQueryResultOpen}
                                     />
                                   )}
                                 </CardContent>
 
                                 {/* Toolbar for assistant messages */}
                                 {msg.role === 'assistant' && !msg.error && (
-                                  <div className="border-t border-slate-200 bg-slate-50 px-3 py-2 flex justify-between items-center">
+                                  <div className="px-1 py-1 flex justify-between items-center">
                                     <button
                                       onClick={() => openNewChatModal(index)}
                                       className="flex items-center gap-1.5 px-2 py-1 text-xs text-slate-600 hover:bg-slate-200 rounded transition-colors"
@@ -1621,7 +1616,7 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                   )}
                 </div>
 
-                <div className="border-t bg-white p-4 flex-shrink-0">
+                <div className="bg-white px-4 pb-4 pt-1 flex-shrink-0">
                   <div className="max-w-6xl mx-auto relative">
                     {/* Command suggestions */}
                     {showCommandSuggestions && filteredCommands.length > 0 && (
@@ -1633,9 +1628,11 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                           {filteredCommands.map((cmd, idx) => (
                             <button
                               key={cmd.command}
+                              onMouseDown={(e) => e.preventDefault()}
                               onClick={() => {
                                 setInput(cmd.command);
                                 setShowCommandSuggestions(false);
+                                inputRef.current?.focus();
                               }}
                               disabled={!cmd.enabled}
                               className={cn(
@@ -1652,22 +1649,22 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                       </div>
                     )}
 
-                    <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
-                      <div className="flex-1 relative">
-                        {quotedText && (
-                          <div className="absolute bottom-full left-0 right-0 mb-1 z-10 flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm">
-                            <div className="w-0.5 self-stretch bg-blue-500 rounded-full flex-shrink-0" />
-                            <span className="text-xs text-slate-500 font-medium flex-shrink-0">Replying to:</span>
-                            <span className="flex-1 text-xs text-slate-700 truncate">{quotedText}</span>
-                            <button
-                              type="button"
-                              onClick={() => setQuotedText(null)}
-                              className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
+                    <form onSubmit={handleSendMessage} className="relative">
+                      {quotedText && (
+                        <div className="absolute bottom-full left-0 right-0 mb-2 z-10 flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm">
+                          <div className="w-0.5 self-stretch bg-blue-500 rounded-full flex-shrink-0" />
+                          <span className="text-xs text-slate-500 font-medium flex-shrink-0">Replying to:</span>
+                          <span className="flex-1 text-xs text-slate-700 truncate">{quotedText}</span>
+                          <button
+                            type="button"
+                            onClick={() => setQuotedText(null)}
+                            className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-1 rounded-3xl border border-slate-300 bg-white shadow-md px-3 py-2 focus-within:border-slate-400 transition-colors">
                         <Textarea
                           ref={inputRef}
                           rows={1}
@@ -1708,18 +1705,30 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                           onBlur={() => setTimeout(() => setShowCommandSuggestions(false), 200)}
                           placeholder="Ask about the code... (type / for commands · Enter to send, Shift+Enter for new line)"
                           disabled={streaming}
-                          className="w-full resize-none min-h-0 max-h-[140px] overflow-y-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+                          className="w-full border-0 shadow-none bg-transparent resize-none min-h-0 max-h-[160px] overflow-y-auto px-1 py-1 focus-visible:ring-0 focus-visible:ring-offset-0"
                         />
+                        <div className="flex justify-end">
+                          {streaming ? (
+                            <button
+                              type="button"
+                              onClick={handleStop}
+                              title="Stop generating"
+                              className="w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-700 text-white flex items-center justify-center transition-colors"
+                            >
+                              <Square className="w-3.5 h-3.5 fill-current" />
+                            </button>
+                          ) : (
+                            <button
+                              type="submit"
+                              disabled={!input.trim()}
+                              title="Send"
+                              className="w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-700 disabled:bg-slate-200 disabled:cursor-not-allowed text-white flex items-center justify-center transition-colors"
+                            >
+                              <ArrowUp className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      {streaming ? (
-                        <Button type="button" variant="destructive" onClick={handleStop} title="Stop generating">
-                          <Square className="w-4 h-4 fill-current" />
-                        </Button>
-                      ) : (
-                        <Button type="submit" disabled={!input.trim()}>
-                          <Send className="w-4 h-4" />
-                        </Button>
-                      )}
                     </form>
                   </div>
                 </div>
@@ -1730,6 +1739,34 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                   <GitBranch className="w-16 h-16 mx-auto mb-4 text-slate-300" />
                   <p className="text-lg font-medium mb-2">No chat selected</p>
                   <p className="text-sm mb-4">Create a new chat to start talking with your code</p>
+                  <Popover open={newChatSelectorOpen} onOpenChange={setNewChatSelectorOpen}>
+                    <PopoverTrigger asChild>
+                      <Button size="sm">
+                        <SquarePen className="w-4 h-4 mr-2" />
+                        New Chat
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0">
+                      <Command>
+                        <CommandInput placeholder="Search branches..." />
+                        <CommandList>
+                          <CommandEmpty>No branch found.</CommandEmpty>
+                          <CommandGroup heading="Select branch for new chat">
+                            {branches.map((b) => (
+                              <CommandItem
+                                key={b.branch}
+                                value={b.branch}
+                                onSelect={(branch) => handleNewChat(branch)}
+                              >
+                                <GitBranch className="mr-2 h-4 w-4 text-slate-500" />
+                                <span className="truncate">{b.branch}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   {!selectedBranch && (
                     <p className="text-xs text-slate-400 mt-2">Select a branch first</p>
                   )}
@@ -2297,32 +2334,6 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                 </div>
               )}
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Provider</label>
-                <Select value={newChatProvider} onValueChange={setNewChatProvider}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="anthropic">Anthropic</SelectItem>
-                    <SelectItem value="openai">OpenAI</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Model</label>
-                <Select value={newChatModel} onValueChange={setNewChatModel} disabled={newChatModelsLoading}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={newChatModelsLoading ? 'Loading…' : undefined} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {newChatAvailableModels.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
             <div className="flex justify-end gap-2">
