@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -172,7 +172,16 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow the chat input up to ~5 rows, then scroll inside it.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+  }, [input]);
+
   // Popup is shown/hidden imperatively (no state) so selection is never disturbed by re-renders.
   const popupRef = useRef<HTMLDivElement>(null);
   const selectedTextRef = useRef<string>('');
@@ -1621,7 +1630,7 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                       </div>
                     )}
 
-                    <form onSubmit={handleSendMessage} className="flex gap-2">
+                    <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
                       <div className="flex-1 relative">
                         {quotedText && (
                           <div className="absolute bottom-full left-0 right-0 mb-1 z-10 flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm">
@@ -1637,8 +1646,9 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                             </button>
                           </div>
                         )}
-                        <Input
+                        <Textarea
                           ref={inputRef}
+                          rows={1}
                           value={input}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -1648,28 +1658,35 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                             if (show) setCommandSelectedIndex(0);
                           }}
                           onKeyDown={(e) => {
-                            if (!showCommandSuggestions) return;
-                            if (e.key === 'ArrowDown') {
-                              e.preventDefault();
-                              setCommandSelectedIndex((i) => Math.min(i + 1, filteredCommands.length - 1));
-                            } else if (e.key === 'ArrowUp') {
-                              e.preventDefault();
-                              setCommandSelectedIndex((i) => Math.max(i - 1, 0));
-                            } else if (e.key === 'Enter') {
-                              const cmd = filteredCommands[commandSelectedIndex];
-                              if (cmd) {
+                            if (showCommandSuggestions) {
+                              if (e.key === 'ArrowDown') {
                                 e.preventDefault();
-                                setInput(cmd.command);
+                                setCommandSelectedIndex((i) => Math.min(i + 1, filteredCommands.length - 1));
+                              } else if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setCommandSelectedIndex((i) => Math.max(i - 1, 0));
+                              } else if (e.key === 'Enter') {
+                                const cmd = filteredCommands[commandSelectedIndex];
+                                if (cmd) {
+                                  e.preventDefault();
+                                  setInput(cmd.command);
+                                  setShowCommandSuggestions(false);
+                                }
+                              } else if (e.key === 'Escape') {
                                 setShowCommandSuggestions(false);
                               }
-                            } else if (e.key === 'Escape') {
-                              setShowCommandSuggestions(false);
+                              return;
+                            }
+                            // Enter sends, Shift+Enter inserts a newline
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSendMessage(e as unknown as React.FormEvent);
                             }
                           }}
                           onBlur={() => setTimeout(() => setShowCommandSuggestions(false), 200)}
-                          placeholder="Ask about the code... (type / to see commands)"
+                          placeholder="Ask about the code... (Enter to send, Shift+Enter for new line)"
                           disabled={streaming}
-                          className="w-full"
+                          className="w-full resize-none min-h-0 max-h-[140px] overflow-y-auto focus-visible:ring-0 focus-visible:ring-offset-0"
                         />
                       </div>
                       <Button type="submit" disabled={streaming || !input.trim()}>
