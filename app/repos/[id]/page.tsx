@@ -2147,7 +2147,13 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
         </Dialog>
 
         {/* Query Result Modal */}
-        <QueryResultModal result={queryResultOpen} onClose={() => setQueryResultOpen(null)} />
+        <QueryResultModal
+          result={queryResultOpen}
+          onClose={() => setQueryResultOpen(null)}
+          onCopyToChat={(text) =>
+            setInput((prev) => (prev ? `${prev}\n\n${text}` : text))
+          }
+        />
 
         {/* New Chat Modal */}
         <Dialog open={newChatModalOpen} onOpenChange={setNewChatModalOpen}>

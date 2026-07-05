@@ -22,6 +22,19 @@ export function SqlCodeBlock({ sql, datasourceId, canExecute, onResult }: SqlCod
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rowCount, setRowCount] = useState<number | null>(null);
+  const [copied, setCopied] = useState<'sql' | 'md' | null>(null);
+
+  const cleanSql = sql.replace(/\n$/, '');
+
+  const copyText = async (text: string, kind: 'sql' | 'md') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(kind);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      // ignore clipboard errors
+    }
+  };
 
   const handleRun = async () => {
     if (!datasourceId || !canExecute) return;
@@ -56,18 +69,20 @@ export function SqlCodeBlock({ sql, datasourceId, canExecute, onResult }: SqlCod
       >
         {sql.replace(/\n$/, '')}
       </SyntaxHighlighter>
-      {datasourceId && (
-        <div className="bg-slate-800 px-3 py-2 flex items-center justify-between gap-3">
-          {canExecute ? (
-            <button
-              onClick={handleRun}
-              disabled={running}
-              className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded transition-colors"
-            >
-              {running ? 'Running…' : '▶ Run'}
-            </button>
-          ) : (
-            <span className="text-xs text-slate-400">No execute access</span>
+      <div className="bg-slate-800 px-3 py-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          {datasourceId && (
+            canExecute ? (
+              <button
+                onClick={handleRun}
+                disabled={running}
+                className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded transition-colors"
+              >
+                {running ? 'Running…' : '▶ Run'}
+              </button>
+            ) : (
+              <span className="text-xs text-slate-400">No execute access</span>
+            )
           )}
           {rowCount !== null && !error && (
             <span className="text-xs text-emerald-400">✓ {rowCount} row{rowCount !== 1 ? 's' : ''} returned</span>
@@ -76,7 +91,21 @@ export function SqlCodeBlock({ sql, datasourceId, canExecute, onResult }: SqlCod
             <span className="text-xs text-red-400 truncate max-w-xs" title={error}>✗ {error}</span>
           )}
         </div>
-      )}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => copyText(cleanSql, 'sql')}
+            className="px-3 py-1 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded transition-colors"
+          >
+            {copied === 'sql' ? '✓ Copied SQL' : '⧉ Copy SQL'}
+          </button>
+          <button
+            onClick={() => copyText('```sql\n' + cleanSql + '\n```', 'md')}
+            className="px-3 py-1 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded transition-colors"
+          >
+            {copied === 'md' ? '✓ Copied SQL as MD' : '⧉ Copy SQL as MD'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
