@@ -333,19 +333,6 @@ export default function AdminSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label>OpenAI Default Model</Label>
-              <Select value={defaultOpenAIModel} onValueChange={setDefaultOpenAIModel}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {openAIModels.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label>Anthropic Default Model</Label>
               <Select value={defaultAnthropicModel} onValueChange={setDefaultAnthropicModel}>
                 <SelectTrigger>
@@ -353,6 +340,19 @@ export default function AdminSettingsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {anthropicModels.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>OpenAI Default Model</Label>
+              <Select value={defaultOpenAIModel} onValueChange={setDefaultOpenAIModel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {openAIModels.map((m) => (
                     <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                   ))}
                 </SelectContent>

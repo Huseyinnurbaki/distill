@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { GitBranch, Send, RefreshCw, ArrowLeft, GitCompare, ArrowDown, ArrowUp, Trash2, FileText, ChevronLeft, ChevronRight, Download, MoreVertical, FolderOpen, Folder, File, Check, ChevronsUpDown, Copy, FoldVertical, MessageSquarePlus, Info, X, Settings, Network, Database, Route, ExternalLink } from 'lucide-react';
+import { GitBranch, Send, Square, RefreshCw, ArrowLeft, GitCompare, ArrowDown, ArrowUp, Trash2, FileText, ChevronLeft, ChevronRight, Download, MoreVertical, FolderOpen, Folder, File, Check, ChevronsUpDown, Copy, FoldVertical, MessageSquarePlus, Info, X, Settings, Network, Database, Route, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MarkdownMessage } from '@/components/markdown-message';
@@ -96,7 +96,7 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [provider, setProvider] = useState('openai');
+  const [provider, setProvider] = useState('anthropic');
   const [model, setModel] = useState('');
   const [availableModels, setAvailableModels] = useState<{ id: string; name: string }[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -173,6 +173,7 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Auto-grow the chat input up to ~5 rows, then scroll inside it.
   useEffect(() => {
@@ -234,8 +235,8 @@ export default function RepoDetailPage({ params }: { params: Promise<{ id: strin
     try {
       const res = await fetch('/api/admin/settings');
       const data = await res.json();
-      if (data.settings?.defaultOpenAIModel) {
-        setModel(data.settings.defaultOpenAIModel);
+      if (data.settings?.defaultAnthropicModel) {
+        setModel(data.settings.defaultAnthropicModel);
       }
     } catch {
       // fall through to model list fallback
@@ -989,11 +990,15 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
     // Signal the useEffect to scroll the new user message to the top once React commits it.
     shouldScrollToLastUserRef.current = true;
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const response = await fetch(`/api/chats/${activeChat.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: displayContent, provider, model }),
+        signal: controller.signal,
       });
 
       const reader = response.body?.getReader();
@@ -1040,22 +1045,34 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
         prev.map((msg) => (msg.id === 'streaming' ? { ...msg, id: Date.now().toString() } : msg))
       );
     } catch (error: any) {
-      console.error('Send message error:', error);
-      // Replace streaming message with error message
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === 'streaming'
-            ? {
-              ...msg,
-              id: 'error-' + Date.now(),
-              content: '⚠️ Something went wrong. Please try typing your message again.',
-              error: true,
-            }
-            : msg
-        )
-      );
-      toast.error('Failed to send message');
+      // User stopped the generation — keep whatever streamed so far.
+      if (error?.name === 'AbortError') {
+        setMessages((prev) =>
+          prev.flatMap((msg) => {
+            if (msg.id !== 'streaming') return [msg];
+            // Drop the empty bubble if nothing streamed before stopping.
+            return msg.content ? [{ ...msg, id: Date.now().toString() }] : [];
+          })
+        );
+      } else {
+        console.error('Send message error:', error);
+        // Replace streaming message with error message
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === 'streaming'
+              ? {
+                ...msg,
+                id: 'error-' + Date.now(),
+                content: '⚠️ Something went wrong. Please try typing your message again.',
+                error: true,
+              }
+              : msg
+          )
+        );
+        toast.error('Failed to send message');
+      }
     } finally {
+      abortControllerRef.current = null;
       setStreaming(false);
       // Only collapse the spacer if it has been pushed below the viewport (AI response
       // was long enough to fill the space). If the spacer is still visible, leave it —
@@ -1117,6 +1134,24 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
       toast.success(`Switched to ${persona.name}`);
     } catch {
       toast.error('Failed to switch persona');
+    }
+  };
+
+  const handleStop = () => {
+    abortControllerRef.current?.abort();
+  };
+
+  const handleModelChange = (newModel: string) => {
+    if (!newModel || newModel === model) return;
+    setModel(newModel);
+    if (activeChat) {
+      setMessages((prev) => [...prev, {
+        id: Date.now().toString(),
+        role: 'model-switch',
+        content: modelDisplayName(provider, newModel),
+        model: newModel,
+        provider,
+      }]);
     }
   };
 
@@ -1370,44 +1405,19 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
           <div className="flex-1 flex flex-col overflow-hidden">
             {activeChat ? (
               <>
-                <div className="border-b bg-white px-6 py-3 flex-shrink-0">
-                  <div className="max-w-6xl mx-auto flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-slate-900">{activeChat.title}</div>
-                      <div className="text-sm text-slate-500">
-                        {activeChat.type === 'COMPARE' ? (
-                          <>
-                            {activeChat.leftBranch}@{activeChat.leftBranch?.slice(0, 7)} ↔{' '}
-                            {activeChat.rightBranch}@{activeChat.rightBranch?.slice(0, 7)}
-                          </>
-                        ) : (
-                          <>
-                            {activeChat.branch}@{activeChat.commitSha?.slice(0, 7)}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Select value={provider} onValueChange={setProvider}>
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="openai">OpenAI</SelectItem>
-                          <SelectItem value="anthropic">Anthropic</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={model} onValueChange={setModel} disabled={modelsLoading}>
-                        <SelectTrigger className="w-48">
-                          <SelectValue placeholder={modelsLoading ? 'Loading…' : undefined} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableModels.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <div className="border-b border-slate-300 bg-white px-6 py-2 flex-shrink-0">
+                  <div className="max-w-6xl mx-auto text-sm">
+                    <span className="font-semibold text-slate-900">{activeChat.title}</span>
+                    <span className="text-slate-500">
+                      {activeChat.type === 'COMPARE' ? (
+                        <>
+                          {' '}({activeChat.leftBranch}@{activeChat.leftBranch?.slice(0, 7)} ↔{' '}
+                          {activeChat.rightBranch}@{activeChat.rightBranch?.slice(0, 7)})
+                        </>
+                      ) : (
+                        <>@{activeChat.commitSha?.slice(0, 7)}</>
+                      )}
+                    </span>
                   </div>
                 </div>
 
@@ -1470,6 +1480,18 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                                 </div>
                               </div>
                             );
+                            return acc;
+                          }
+                          // Immediate model-switch pill (appended when the user changes the model)
+                          if (msg.role === 'model-switch') {
+                            acc.elements.push(
+                              <div key={`model-switch-${msg.id}`} className="flex justify-center">
+                                <div className="px-4 py-2 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                                  🤖 Switched to {msg.content}
+                                </div>
+                              </div>
+                            );
+                            if (msg.model) acc.lastModel = msg.model;
                             return acc;
                           }
                           // Insert a model-switch pill before an assistant message if model changed
@@ -1684,14 +1706,20 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                             }
                           }}
                           onBlur={() => setTimeout(() => setShowCommandSuggestions(false), 200)}
-                          placeholder="Ask about the code... (Enter to send, Shift+Enter for new line)"
+                          placeholder="Ask about the code... (type / for commands · Enter to send, Shift+Enter for new line)"
                           disabled={streaming}
                           className="w-full resize-none min-h-0 max-h-[140px] overflow-y-auto focus-visible:ring-0 focus-visible:ring-offset-0"
                         />
                       </div>
-                      <Button type="submit" disabled={streaming || !input.trim()}>
-                        <Send className="w-4 h-4" />
-                      </Button>
+                      {streaming ? (
+                        <Button type="button" variant="destructive" onClick={handleStop} title="Stop generating">
+                          <Square className="w-4 h-4 fill-current" />
+                        </Button>
+                      ) : (
+                        <Button type="submit" disabled={!input.trim()}>
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      )}
                     </form>
                   </div>
                 </div>
@@ -2071,6 +2099,34 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                 )}
               </div>
               <hr className="border-slate-200" />
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm font-medium text-slate-900">Model</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Provider and model used for this chat</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={provider} onValueChange={setProvider}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="anthropic">Anthropic</SelectItem>
+                      <SelectItem value="openai">OpenAI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={model} onValueChange={handleModelChange} disabled={modelsLoading}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder={modelsLoading ? 'Loading…' : undefined} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableModels.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <hr className="border-slate-200" />
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-900">Sync Repository</p>
@@ -2248,8 +2304,8 @@ Now we're on **\`${newChatBranch}\`**. The code and files may be different here.
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="openai">OpenAI</SelectItem>
                     <SelectItem value="anthropic">Anthropic</SelectItem>
+                    <SelectItem value="openai">OpenAI</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
